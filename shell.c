@@ -6,7 +6,7 @@
 /*   By: tkeil <tkeil@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/13 16:52:49 by tkeil             #+#    #+#             */
-/*   Updated: 2025/03/13 21:15:21 by tkeil            ###   ########.fr       */
+/*   Updated: 2025/03/13 21:37:13 by tkeil            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -110,10 +110,16 @@ void ft_execute(char **cmds, char **env, int tmp_in)
 	}
 }
 
+void ft_free(void)
+{
+	system("leaks shell");
+}
+
 int main(int ac, char **av, char **env)
 {
 	char **cmds;
 	int fd[2], tmp_in = dup(STDIN_FILENO), i = 0, j = 0, pid;
+	atexit(ft_free);
 
 	if (ac < 2)
 		return (0);
@@ -129,7 +135,7 @@ int main(int ac, char **av, char **env)
 		else if (j && (!av[i + j] || !strcmp(av[i + j], ";")))
 		{
 			if ((pid = fork()) == -1)
-				return (ft_putstrs("error: fatal", NULL), 1);
+				return (ft_putstrs("error: fatal", NULL), ft_clean_cmds(cmds), 1);
 			if (pid == 0)
 			{
 				ft_execute(cmds, env, tmp_in);
@@ -137,7 +143,9 @@ int main(int ac, char **av, char **env)
 			else
 			{
 				close(tmp_in);
-				while (waitpid(-1, &ret, 0) != -1);
+				while (waitpid(-1, &ret, WUNTRACED) != -1);
+				if (WIFEXITED(ret))
+					ret = WEXITSTATUS(ret);
 				tmp_in = dup(STDIN_FILENO);
 				ft_clean_cmds(cmds);				
 			}
@@ -145,9 +153,9 @@ int main(int ac, char **av, char **env)
 		else if (j && !strcmp(av[i + j], "|"))
 		{
 			if (pipe(fd) == -1)
-				return (ft_putstrs("error: fatal", NULL), 1);
+				return (ft_putstrs("error: fatal", NULL), ft_clean_cmds(cmds), 1);
 			if ((pid = fork()) == -1)
-				return (ft_putstrs("error: fatal", NULL), close(fd[0]), close(fd[1]), 1);
+				return (ft_putstrs("error: fatal", NULL), ft_clean_cmds(cmds), close(fd[0]), close(fd[1]), 1);
 			if (pid == 0)
 			{
 				dup2(fd[1], STDOUT_FILENO);
